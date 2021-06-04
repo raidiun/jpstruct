@@ -62,14 +62,21 @@ export class Struct {
         return result;
     }
 
+    // Pack arguments according to format
+    //  Returns: Uint8Array
+    // ...varargs: any - Arguments to pack
     pack(...varargs) {
-        let buffer = new ArrayBuffer(this.size);
+        let buffer = new Uint8Array(this.size);
         this.pack_into(buffer,0,...varargs);
         return buffer;
     }
     
+    // Pack arguments into specified buffer according to format
+    // buffer: Uint8Array - Buffer to pack arguments into
+    // offset: int - Offset into buffer at which to begin packing
+    // ...varargs: any - Arguments to pack
     pack_into(buffer, offset, ...varargs) {
-        let view = new DataView(buffer,offset);
+        let view = new DataView(buffer.buffer,buffer.byteOffset+offset);
         let view_index = 0;
 
         let arg_index = 0;
@@ -103,12 +110,19 @@ export class Struct {
 
     }
 
+    // Unpack arguments from buffer according to format
+    //  Returns: [any]
+    // buffer: Uint8Array - Buffer to unpack from
     unpack(buffer) {
         return this.unpack_from(buffer,0);
     }
     
+    // Unpack arguments from offset in buffer according to format
+    //  Returns: [any]
+    // buffer: Uint8Array - Buffer to unpack from
+    // offset: int - Offset into buffer at which to begin unpacking
     unpack_from(buffer, offset=0) {
-        let view = new DataView(buffer);
+        let view = new DataView(buffer.buffer,buffer.byteOffset+offset);
         let view_index = 0;
         
         let unpacked_values = [];
@@ -128,7 +142,7 @@ export class Struct {
                 let result = unpack_string(view,view_index,count);
                 view_index += count;
                 if (result !== undefined) {
-                    unpacked_values.append(result);
+                    unpacked_values.push(result);
                 }
                 continue;
             }
@@ -148,22 +162,43 @@ export class Struct {
 
 }
 
+// Return the bytesize of format
+//  Returns: int
+// format: string - Format to calculate size of
 export function calcsize(format) {
     return (new Struct(format)).size;
 }
 
+// Pack arguments according to format
+//  Returns: Uint8Array
+// format: string - Format to use
+// ...varargs: any - Arguments to pack
 export function pack(format, ...varargs) {
     return (new Struct(format)).pack(...varargs);
     }
 
+// Pack arguments into specified buffer according to format
+// format: string - Format to use
+// buffer: Uint8Array - Buffer to pack arguments into
+// offset: int - Offset into buffer at which to begin packing
+// ...varargs: any - Arguments to pack
 export function pack_into(format, buffer, offset, ...varargs) {
     return (new Struct(format)).pack_into(buffer,offset, ...varargs);
 }
 
+// Unpack arguments from buffer according to format
+//  Returns: [any]
+// format: string - Format to use
+// buffer: Uint8Array - Buffer to unpack from
 export function unpack(format,buffer) {
     return (new Struct(format)).unpack(buffer);
 }
 
+// Unpack arguments from offset in buffer according to format
+//  Returns: [any]
+// format: string - Format to use
+// buffer: Uint8Array - Buffer to unpack from
+// offset: int - Offset into buffer at which to begin unpacking
 export function unpack_from(format,buffer,offset=0) {
     return (new Struct(format)).unpack_from(buffer,offset);
 }
@@ -219,7 +254,7 @@ function unpack_double(view,offset) {
 }
 
 function unpack_string(view,offset,length) {
-    return view.slice(offset,offset+length);
+    return new Uint8Array(view.buffer,view.byteOffset+offset,length);
 }
 
 // Little-endian pack routines
@@ -287,6 +322,6 @@ function pack_string(view,offset,length,value) {
         }
     }
     else {
-        destView.set(value);
+        destView.set(value.slice(0,length));
     }
 }
