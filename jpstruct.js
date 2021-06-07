@@ -21,7 +21,7 @@ export class Struct {
             "q": [8,unpack_long_long,pack_long_long],
             "Q": [8,unpack_unsigned_long_long,pack_unsigned_long_long],
             "f": [4,unpack_float,pack_float],
-            "d": [4,unpack_double,pack_double],
+            "d": [8,unpack_double,pack_double],
         };
 
     static _format_pattern = "(\\d+)?([AxcbBhHsfdiIlLqQ])";
