@@ -395,6 +395,8 @@ describe('Test integers', function() {
     }
 });
 
+// TODO: Pascal String support?
+
 describe('Test 705836', function() {
     /* SF bug 705836.  "<f" and ">f" had a severe rounding bug, where a carry
        from the low-order discarded bits could propagate into the exponent
@@ -560,6 +562,48 @@ describe('Test pack into', function() {
         should.throws(() => {
             jpstruct.pack_into('h', small_buf, undefined);
         },TypeError);
+    });
+
+});
+
+describe('Test bool', function() {
+    const falsy = ['', 0, null, NaN];
+    const truthy = [[1], 'test', 5, -1, 0xffffffff+1, 0xffffffff/2, []];
+
+    for(let prefix of [...'<>!=','']) {
+        it(`Passes for prefix ${prefix}`, function() {
+        const falseFormat = prefix + ('?'.repeat(falsy.length));
+        const packedFalse = jpstruct.pack(falseFormat, ...falsy)
+        const unpackedFalse = jpstruct.unpack(falseFormat, packedFalse)
+
+        falsy.length.should.be.eql(unpackedFalse.length);
+        unpackedFalse.forEach( e => e.should.be.eql(false));
+
+        const trueFormat = prefix + ('?'.repeat(truthy.length));
+        const packedTrue = jpstruct.pack(trueFormat, ...truthy)
+        const unpackedTrue = jpstruct.unpack(trueFormat, packedTrue)
+
+        truthy.length.should.be.eql(unpackedTrue.length);
+        unpackedTrue.forEach( e => e.should.be.False);
+
+
+        let packed = jpstruct.pack(prefix+'?', 1);
+
+        packed.length.should.be.eql(jpstruct.calcsize(prefix+'?'));
+
+        packed.length.should.be.eql(1);
+
+        });
+    }
+
+    it('Unpacks multiple true bits as true', function() {
+        function b(arr) {
+            const numArr = arr.map(e => (typeof e === 'number' ? e : e.charCodeAt(0)) );
+            return Uint8Array.from(numArr);
+        }
+        for(let c of [b([0x01]), b([0x7f]), b([0xff]), b([0x0f]), b([0xf0])] ) {
+            jpstruct.unpack('>?', c)[0].should.be.True;
+        }
     });
 
 });
