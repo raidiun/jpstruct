@@ -5,6 +5,21 @@ Minimal for MAVLink work
 
 */
 
+function is_platform_littleendian() {
+    // Stolen from: https://abdulapopoola.com/2019/01/20/check-endianness-with-javascript/
+    const uint32Array = new Uint32Array([0x11223344]);
+    const uint8Array = new Uint8Array(uint32Array.buffer);
+
+    if(uint8Array[0] === 0x44) {
+        return true;
+    }
+    else if( uint8Array[0] === 0x11 ) {
+        return false;
+    }
+
+    throw new Error('Unknown endianness');
+}
+
 export class Struct {
     static _format_lookup = {
             "x": [1,() => undefined, () => {}],
@@ -24,20 +39,37 @@ export class Struct {
             "d": [8,unpack_double,pack_double],
         };
 
-    static _format_pattern = "(\\d+)?([AxcbBhHsfdiIlLqQ])";
+    static _format_element_pattern = "(\\d+)?([AxcbBhHsfdiIlLqQ?])";
+    static _format_pattern = "^[@=<>!]?((\\d+)?([AxcbBhHsfdiIlLqQ?]))+$";
+
+    static _is_format_littleendian(format) {
+        switch( format[0] ) {
+            case('<'):
+                return true;
+            case('>'):
+            case('!'):
+                return false;
+            case('@'):
+            case('='):
+            default:
+                return is_platform_littleendian();
+        }
+    }
 
     constructor(format) {
+        const formatRegex = new RegExp(Struct._format_pattern);
+        if( ! formatRegex.test(format) ) {
+            throw new Error("Invalid format string");
+        }
         this.format = format;
         this.size = this._calc_size();
-        if( this.format[0] != '<' ) {
-            throw new Error('Unsupported format string');
-        }
+        this.littleEndian = Struct._is_format_littleendian(format);
     }
 
     _calc_size() {
         let result = 0;
 
-        let re = new RegExp(Struct._format_pattern,"g");
+        let re = new RegExp(Struct._format_element_pattern,"g");
         let match;
         while( (match = re.exec(this.format)) !== null ) {
 
@@ -81,9 +113,13 @@ export class Struct {
 
         let arg_index = 0;
 
-        let re = new RegExp(Struct._format_pattern,"g");
+        let re = new RegExp(Struct._format_element_pattern,"g");
         let match;
         while( (match = re.exec(this.format)) !== null ) {
+
+            if( varargs[arg_index] === undefined ) {
+                throw new Error("Insufficient arguments for format string");
+            }
 
             let count = 1;
             if( match[1] !== undefined && match[1] !== "") {
@@ -101,11 +137,20 @@ export class Struct {
 
             for(let repeats = 0; repeats < count; repeats++) {
                 let [size,unpack_func,pack_func] = Struct._format_lookup[match[2]];
-                let result = pack_func(view,view_index,varargs[arg_index]);
+                let result = pack_func(view,view_index,varargs[arg_index],this.littleEndian);
                 view_index += size;
                 arg_index += 1;
             }
 
+            if( match[2] == "x" ) {
+                // For padding bytes we shouldn't advance the arg_index
+                arg_index -= 1;
+            }
+
+        }
+
+        if( arg_index != varargs.length ) {
+            throw new Error("Too many arguments provided");
         }
 
     }
@@ -127,7 +172,7 @@ export class Struct {
         
         let unpacked_values = [];
 
-        let re = new RegExp(Struct._format_pattern,"g");
+        let re = new RegExp(Struct._format_element_pattern,"g");
         let match;
         while( (match = re.exec(this.format)) !== null ) {
 
@@ -149,7 +194,7 @@ export class Struct {
 
             for(let repeats = 0; repeats < count; repeats++) {
                 let [size,unpack_func,pack_func] = Struct._format_lookup[match[2]];
-                let result = unpack_func(view,view_index)
+                let result = unpack_func(view,view_index,this.littleEndian);
                 view_index += size;
                 if (result !== undefined) {
                     unpacked_values.push(result);
@@ -204,53 +249,53 @@ export function unpack_from(format,buffer,offset=0) {
 }
 
 // Little-endian unpack routines
-function unpack_char(view,offset) {
+function unpack_char(view,offset,littleEndian) {
     return String.fromCharCode(view.getUint8(offset));
 }
 
-function unpack_signed_char(view,offset) {
+function unpack_signed_char(view,offset,littleEndian) {
     return view.getInt8(offset);
 }
 
-function unpack_unsigned_char(view,offset) {
+function unpack_unsigned_char(view,offset,littleEndian) {
     return view.getUint8(offset);
 }
 
-function unpack_bool(view,offset) {
+function unpack_bool(view,offset,littleEndian) {
     return view.getUint8(offset) !== 0;
 }
 
-function unpack_short(view,offset) {
-    return view.getInt16(offset,true);
+function unpack_short(view,offset,littleEndian) {
+    return view.getInt16(offset,littleEndian);
 }
 
-function unpack_unsigned_short(view,offset) {
-    return view.getUint16(offset,true);
+function unpack_unsigned_short(view,offset,littleEndian) {
+    return view.getUint16(offset,littleEndian);
 }
 
-function unpack_int(view,offset) {
-    return view.getInt32(offset,true);
+function unpack_int(view,offset,littleEndian) {
+    return view.getInt32(offset,littleEndian);
 }
 
-function unpack_unsigned_int(view,offset) {
-    return view.getUint32(offset,true);
+function unpack_unsigned_int(view,offset,littleEndian) {
+    return view.getUint32(offset,littleEndian);
 }
 
-function unpack_long_long(view,offset) {
-    return view.getBigInt64(offset,true);
+function unpack_long_long(view,offset,littleEndian) {
+    return view.getBigInt64(offset,littleEndian);
 }
 
-function unpack_unsigned_long_long(view,offset) {
-    return view.getBigUint64(offset,true);
+function unpack_unsigned_long_long(view,offset,littleEndian) {
+    return view.getBigUint64(offset,littleEndian);
 }
 
 
-function unpack_float(view,offset) {
-    return view.getFloat32(offset,true);
+function unpack_float(view,offset,littleEndian) {
+    return view.getFloat32(offset,littleEndian);
 }
 
-function unpack_double(view,offset) {
-    return view.getFloat64(offset,true);
+function unpack_double(view,offset,littleEndian) {
+    return view.getFloat64(offset,littleEndian);
 }
 
 function unpack_string(view,offset,length) {
@@ -258,58 +303,58 @@ function unpack_string(view,offset,length) {
 }
 
 // Little-endian pack routines
-function pack_char(view,offset,value) {
+function pack_char(view,offset,value,littleEndian) {
     view.setUint8(offset,value.charCodeAt(0));
 }
 
-function pack_signed_char(view,offset,value) {
+function pack_signed_char(view,offset,value,littleEndian) {
     view.setInt8(offset,value);
 }
 
-function pack_unsigned_char(view,offset,value) {
+function pack_unsigned_char(view,offset,value,littleEndian) {
     view.setUint8(offset,value);
 }
 
-function pack_bool(view,offset,value) {
+function pack_bool(view,offset,value,littleEndian) {
     view.setUint8(offset,value ? 1 : 0);
 }
 
-function pack_short(view,offset,value) {
-    view.setInt16(offset,value,true);
+function pack_short(view,offset,value,littleEndian) {
+    view.setInt16(offset,value,littleEndian);
 }
 
-function pack_unsigned_short(view,offset,value) {
-    view.setUint16(offset,value,true);
+function pack_unsigned_short(view,offset,value,littleEndian) {
+    view.setUint16(offset,value,littleEndian);
 }
 
-function pack_int(view,offset,value) {
-    view.setInt32(offset,value,true);
+function pack_int(view,offset,value,littleEndian) {
+    view.setInt32(offset,value,littleEndian);
 }
 
-function pack_unsigned_int(view,offset,value) {
-    view.setUint32(offset,value,true);
+function pack_unsigned_int(view,offset,value,littleEndian) {
+    view.setUint32(offset,value,littleEndian);
 }
 
-function pack_long_long(view,offset,value) {
+function pack_long_long(view,offset,value,littleEndian) {
     if( typeof value !== 'bigint' ) {
         value = BigInt(value);
     }
-    view.setBigInt64(offset,value,true);
+    view.setBigInt64(offset,value,littleEndian);
 }
 
-function pack_unsigned_long_long(view,offset,value) {
+function pack_unsigned_long_long(view,offset,value,littleEndian) {
     if( typeof value !== 'bigint' ) {
         value = BigInt(value);
     }
-    view.setBigUint64(offset,value,true);
+    view.setBigUint64(offset,value,littleEndian);
 }
 
-function pack_float(view,offset,value) {
-    view.setFloat32(offset,value,true);
+function pack_float(view,offset,value,littleEndian) {
+    view.setFloat32(offset,value,littleEndian);
 }
 
-function pack_double(view,offset,value) {
-    view.setFloat64(offset,value,true);
+function pack_double(view,offset,value,littleEndian) {
+    view.setFloat64(offset,value,littleEndian);
 }
 
 function pack_string(view,offset,length,value) {
