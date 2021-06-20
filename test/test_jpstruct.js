@@ -463,6 +463,55 @@ describe('Test coercion of floats', function() {
     }
 });
 
+describe('Test unpack_from', function() {
+    function b(str) {
+        return Uint8Array.from([...str].map(e => e.charCodeAt(0)));
+    }
+
+    function range(n,m=undefined) {
+        if( m === undefined ) {
+            return [...Array(n).keys()];
+        }
+        else {
+            return [...Array(m).keys()].slice(n);
+        }
+    }
+ 
+    const data = b('abcd01234');
+    const fmt = '4s';
+
+    it('Unpacks at offsets from a class', function() {
+        const s = new jpstruct.Struct(fmt);
+        s.unpack_from(data   ).should.be.eql([b('abcd')]);
+        s.unpack_from(data, 2).should.be.eql([b('cd01')]);
+        s.unpack_from(data, 4).should.be.eql([b('0123')]);
+        for(let i of range(6)) {
+            s.unpack_from(data, i).should.be.eql([data.slice(i,i+4)]);
+        }
+        
+        for( let i of range(6, data.length + 1)) {
+            should.throws(() => {
+                s.unpack_from(data, i);
+            });
+        }
+    });
+ 
+    it('Unpacks at offsets called directly', function() {
+        jpstruct.unpack_from(fmt,data   ).should.be.eql([b('abcd')]);
+        jpstruct.unpack_from(fmt,data, 2).should.be.eql([b('cd01')]);
+        jpstruct.unpack_from(fmt,data, 4).should.be.eql([b('0123')]);
+        for(let i of range(6)) {
+            jpstruct.unpack_from(fmt,data, i).should.be.eql([data.slice(i,i+4)]);
+        }
+        
+        for( let i of range(6, data.length + 1)) {
+            should.throws(() => {
+                jpstruct.unpack_from(fmt,data, i);
+            });
+        }
+    });
+
+});
 
 describe('Test signed/unsigned int64:', function() {
 
