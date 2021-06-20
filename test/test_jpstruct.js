@@ -808,7 +808,7 @@ describe('MAVLink tests:', function() {
         bytes.should.be.eql(body);
     });
 
-    it('Supports whutespace in format strings', function() {
+    it('Supports whitespace in format strings', function() {
 
         this.msgId = 130;
 

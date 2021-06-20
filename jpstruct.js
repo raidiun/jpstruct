@@ -450,6 +450,7 @@ function pack_string(view,offset,length,value) {
         }
     }
     else {
+        // TODO: Add checks here
         destView.set(value.slice(0,length));
     }
 }
