@@ -513,6 +513,57 @@ describe('Test unpack_from', function() {
 
 });
 
+describe('Test pack into', function() {
+    function b(str) {
+        return Uint8Array.from([...str].map(e => e.charCodeAt(0)));
+    }
+
+    function range(n,m=undefined) {
+        if( m === undefined ) {
+            return [...Array(n).keys()];
+        }
+        else {
+            return [...Array(m).keys()].slice(n);
+        }
+    }
+
+    const test_string = b('Reykjavik rocks, eow!');
+    
+    const fmt = '21s'
+    const s = new jpstruct.Struct(fmt)
+    let writable_buf = new Uint8Array(100);
+
+    it('Packs without offset', function() {
+        s.pack_into(writable_buf, 0, test_string);
+        let from_buf = writable_buf.slice(0,test_string.length);
+        from_buf.should.be.eql(test_string);
+    });
+
+    it('Packs with offset', function() {
+        s.pack_into(writable_buf, 10, test_string);
+        let from_buf = writable_buf.slice(0,test_string.length+10);
+        from_buf.should.be.eql(Uint8Array.from([...test_string.slice(0,10),...test_string]));
+    });
+
+    it('Throws going over boundaries', function() {
+        let small_buf = new Uint8Array(10);;
+        should.throws(() => {
+            s.pack_into(small_buff, 0, test_string);
+        });
+        should.throws(() => {
+            s.pack_into(small_buf, 2, test_string);
+        });
+    });
+
+    it('Deals with bogus offsets', function() {
+        let small_buf = new Uint8Array(10);;
+        should.throws(() => {
+            jpstruct.pack_into('h', small_buf, undefined);
+        },TypeError);
+    });
+
+});
+
 describe('Test signed/unsigned int64:', function() {
 
     // Number 0xffa0ffe1ffff, packed with Python struct:

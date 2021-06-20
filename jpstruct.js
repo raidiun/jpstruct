@@ -126,6 +126,9 @@ export class Struct {
     // offset: int - Offset into buffer at which to begin packing
     // ...varargs: any - Arguments to pack
     pack_into(buffer, offset, ...varargs) {
+        if( (typeof offset !== 'number') || !Number.isInteger(offset)) {
+            throw new TypeError(`Offset must be an integer, got ${offset}`);
+        }
         let view = new DataView(buffer.buffer,buffer.byteOffset+offset);
         let view_index = 0;
 
