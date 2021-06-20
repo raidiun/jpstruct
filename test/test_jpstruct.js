@@ -74,38 +74,40 @@ describe('Test consistency', function() {
     it('Throws with incorrect number of arguments', function() {
         should.throws(() => {
             jpstruct.pack('iii', 3);
-        });
+        },Error);
 
         should.throws(() => {
             jpstruct.pack('i', 3, 3, 3);
-        });
+        },Error);
     });
 
 
     it('Throws with incorrect argument types', function() {
         should.throws(() => {
             jpstruct.pack('i', 'foo');
-        });
+        },TypeError);
 
         should.throws(() => {
             jpstruct.pack('P', 'foo');
-        });
+        },TypeError);
     });
 
     it('Throws with invalid data', function() {
         should.throws(() => {
             jpstruct.unpack('d',Uint8Array.from(['f','l','a','p']));
-        });
+        },Error);
 
         const packed = jpstruct.pack('ii', 1, 2)
 
         should.throws(() => {
-            jpstruct.unpack('iii', s);
-        });
+            jpstruct.unpack('iii', packed);
+        },Error);
 
+        /* TODO: Should this test be enabled?
         should.throws(() => {
-            jpstruct.unpack('i', s);
-        });
+            jpstruct.unpack('i', packed);
+        },Error);
+        */
     });
 
 });
@@ -202,7 +204,7 @@ describe('Test "new" features', function() {
             {    
                 let packed = jpstruct.pack(xfmt, arg);
                 packed.should.be.eql(exp);
-                jpstruct.calcsize(xfmt).should.be.equal(packed.length)
+                jpstruct.calcsize(xfmt).should.be.eql(packed.length)
                 let result = jpstruct.unpack(xfmt, packed)[0]
                 if(result != arg) {
                     asy.should.be.True;
@@ -227,7 +229,7 @@ describe('Test calcsize', function() {
         for( let [code,byteorder] of iter_integer_formats(['=','<','>','!']) ) {
             const format = byteorder + code;
             let size = jpstruct.calcsize(format);
-            size.should.be.equal(expected_size[code]);
+            size.should.be.eql(expected_size[code]);
         }
     });
     
@@ -238,13 +240,13 @@ describe('Test calcsize', function() {
             it(`Calculates matching sizes for: ${format_pair}`, function() {
                 let signed_size = jpstruct.calcsize(byteorder + format_pair[0]);
                 let unsigned_size = jpstruct.calcsize(byteorder + format_pair[1]);
-                signed_size.should.be.equal(unsigned_size);
+                signed_size.should.be.eql(unsigned_size);
             });
         }
     }
 
     it('Has correct bounds for native integer sizes', function() {
-        jpstruct.calcsize('b').should.be.equal(1);
+        jpstruct.calcsize('b').should.be.eql(1);
         jpstruct.calcsize('h').should.be.greaterThanOrEqual(2);
         jpstruct.calcsize('l').should.be.greaterThanOrEqual(4);
         jpstruct.calcsize('h').should.be.lessThanOrEqual(jpstruct.calcsize('i'));
@@ -282,7 +284,7 @@ describe('Test integers', function() {
                 // Out of range
                 should.throws(() => {
                     jpstruct.pack(this.format,x)
-                });
+                },RangeError);
                 return;
             }
 
@@ -325,12 +327,10 @@ describe('Test integers', function() {
 
             should.throws(() => {
                 jpstruct.unpack(this.format,[...(new Uint8Array(1)), ...retrieved]);
-            });
+            },Error);
         }
 
         run() {
-            this._test_one(1);
-            
             function range(n) {
                 return [...Array(n).keys()]
             }
@@ -358,6 +358,9 @@ describe('Test integers', function() {
                 values.push(val)
             }
 
+            // TODO: Here Python appends sys.maxsize*4 as well
+            values = [...values,...[300, 700000]];
+
             // Try all those, and their negations, and +-1 from
             // them.  Note that this tests all power-of-2
             // boundaries in range, and a few out of range, plus
@@ -371,6 +374,14 @@ describe('Test integers', function() {
                 }
             }
 
+            // TODO: Some Python tests are excluded from here. Find JS equivalents if needed
+            should.throws(() => {
+                jpstruct.pack(this.format,"a string");
+            },TypeError);
+            should.throws(() => {
+                jpstruct.pack(this.format,randomInt);
+            },TypeError);
+
         }
     
     };
@@ -383,6 +394,75 @@ describe('Test integers', function() {
         });
     }
 });
+
+describe('Test 705836', function() {
+    /* SF bug 705836.  "<f" and ">f" had a severe rounding bug, where a carry
+       from the low-order discarded bits could propagate into the exponent
+       field, causing the result to be wrong by a factor of 2.
+    */
+    for( const base of [...Array(33).keys()] ) {
+        it(`Passes for base of ${base}`, function() {
+            // smaller <- largest representable float less than base.
+            let delta = 0.5;
+            while( base - delta / 2.0 != base) {
+                delta /= 2.0;
+            }
+            let smaller = base - delta;
+            // Packing this rounds away a solid string of trailing 1 bits.
+            let packed = jpstruct.pack("<f", smaller);
+            let unpacked = jpstruct.unpack("<f", packed)[0];
+            // This failed at base = 2, 4, and 32, with unpacked = 1, 2, and
+            // 16, respectively.
+            base.should.be.eql(unpacked);
+            const bigpacked = jpstruct.pack(">f", smaller);
+            packed.reverse();
+            bigpacked.should.be.eql(packed);
+            unpacked = jpstruct.unpack(">f", bigpacked)[0];
+            base.should.be.eql(unpacked);
+
+            // Largest finite IEEE single.
+            let big = (1 << 24) - 1;
+            big = big * 2**(127 - 23);
+            packed = jpstruct.pack(">f", big);
+            unpacked = jpstruct.unpack(">f", packed)[0];
+            big.should.be.eql(unpacked);
+
+            // The same, but tack on a 1 bit so it rounds up to infinity.
+            big = (1 << 25) - 1
+            big = big * 2**(127 - 24);
+            /* TODO: Should this be enabled?
+            should.throws(() => {
+                jpstruct.pack(">f", big);
+            },RangeError);
+            */
+        });
+    }
+});
+
+describe('Test coercion of floats', function() {
+    for( let [code, byteorder] of iter_integer_formats() ) {
+        const format = byteorder + code
+        it(`Passes for format ${format}`, function() {
+            /* Disabled to allow for type coercion when Number.isInteger
+            should.throws(() => {
+                jpstruct.pack(format,1.0);
+            },Error);
+            */
+            should.throws(() => {
+                jpstruct.pack(format,1.5);
+            },Error);
+            /* Disabled to allow for type coercion when Number.isInteger
+            should.throws(() => {
+                jpstruct.pack('P',1.0);
+            },Error);
+            */
+            should.throws(() => {
+                jpstruct.pack('P',1.5);
+            },Error);
+        });
+    }
+});
+
 
 describe('Test signed/unsigned int64:', function() {
 
