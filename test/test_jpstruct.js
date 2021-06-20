@@ -126,6 +126,80 @@ describe('Test transitiveness', function() {
     }
 });
 
+describe('Test "new" features', function() {
+    function b(arr) {
+        const numArr = arr.map(e => (typeof e === 'number' ? e : e.charCodeAt(0)) );
+        return Uint8Array.from(numArr);
+    }
+    const test_definitions = [
+        ['c',  'a', b(['a']),   b(['a']),   0],
+        ['xc', 'a', b([0,'a']), b([0,'a']), 0],
+        ['cx', 'a', b(['a',0]), b(['a',0]), 0],
+        ['s',  'a', b(['a']),   b(['a']),   0],
+        ['0s',  'helloworld', b([]), b([]), 1],
+        ['1s',  'helloworld', b(['h']), b(['h']), 1],
+        ['9s',  'helloworld',
+            b(['h','e','l','l','o','w','o','r','l']),
+            b(['h','e','l','l','o','w','o','r','l']), 1],
+        ['10s', 'helloworld',
+            b(['h','e','l','l','o','w','o','r','l','d']),
+            b(['h','e','l','l','o','w','o','r','l','d']), 0],
+        ['11s', 'helloworld',
+            b(['h','e','l','l','o','w','o','r','l','d',0]),
+            b(['h','e','l','l','o','w','o','r','l','d',0]), 1],
+        ['20s', 'helloworld',
+            b(['h','e','l','l','o','w','o','r','l','d',0,0,0,0,0,0,0,0,0,0]),
+            b(['h','e','l','l','o','w','o','r','l','d',0,0,0,0,0,0,0,0,0,0]), 1],
+        ['b',    7,        b([7]),       b([7]),       0],
+        ['b',   -7,        b([249]),     b([249]),     0],
+        ['B',    7,        b([7]),       b([7]),       0],
+        ['B',  249,        b([249]),     b([249]),     0],
+        ['h',  700,        b([2,188]),   b([188,2]),   0],
+        ['h', -700,        b([253,'D']), b(['D',253]), 0],
+        ['H',  700,        b([2,188]),   b([188,2]),   0],
+        ['H', 0x10000-700, b([253,'D']), b(['D',253]), 0],
+        ['i', 70000000, b([4,',',29,128]), b([128,29,',',4]), 0],
+        ['i', -70000000, b([251,211,226,128]), b([128,226,211,251]), 0],
+        ['I', 70000000, b([4,',',29,128]), b([128,29,',',4]), 0],
+        ['I', 0x100000000-70000000, b([251,211,226,128]), b([128,226,211,251]), 0],
+        ['l', 70000000, b([4,',',29,128]), b([128,29,',',4]), 0],
+        ['l', -70000000, b([251,211,226,128]), b([128,226,211,251]), 0],
+        ['L', 70000000, b([4,',',29,128]), b([128,29,',',4]), 0],
+        ['L', 0x100000000-70000000, b([251,211,226,128]), b([128,226,211,251]), 0],
+        ['f', 2.0, b(['@',0,0,0]), b([0,0,0,'@']), 0],
+        ['d', 2.0, b(['@',0,0,0,0,0,0,0]), b([0,0,0,0,0,0,0,'@']), 0],
+        ['f', -2.0, b([192,0,0,0]), b([0,0,0,192]), 0],
+        ['d', -2.0, b([192,0,0,0,0,0,0,0]), b([0,0,0,0,0,0,0,192]), 0],
+        ['?', 0, b([0]), b([0]), 0],
+        ['?', 3, b([1]), b([1]), 1],
+        ['?', true, b([1]), b([1]), 0],
+//        ['?', [], b([0]), b([0]), 1],
+        ['?', [1,], b([1]), b([1]), 1]
+    ];
+    
+    for(const [fmt,arg,big,lil,asy] of test_definitions) {
+        for( const [xfmt, exp] of [
+                ['>'+fmt, big],
+                ['!'+fmt, big],
+                ['<'+fmt, lil],
+                ['='+fmt, is_platform_bigendian() ? big : lil ]
+                ])
+        {
+            it(`Passes test of format ${xfmt} with arg ${arg}`, function() {
+                let packed = jpstruct.pack(xfmt, arg);
+                packed.should.be.eql(exp);
+                jpstruct.calcsize(xfmt).should.be.equal(packed.length)
+                let result = jpstruct.unpack(xfmt, packed)[0]
+                if(result != arg) {
+                    asy.should.be.True;
+                    }
+            });
+
+        }
+        
+    }
+});
+
 describe('Test calcsize', function() {
     let expected_size = {
         'b': 1, 'B': 1,
