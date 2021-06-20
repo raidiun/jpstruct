@@ -6,8 +6,8 @@ import * as jpstruct from '../jpstruct.js';
 //const byteorders = ['', '@', '=', '<', '>', '!'];
 
 // nN are exluded as they only exist for native byteorders
-const integer_codes = ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', ];
-const byteorders = ['<'];// Only testing explicit little endian for now
+const integer_codes = ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', 'n', 'N' ];
+const byteorders = ['', '@', '=', '<', '>', '!'];
 
 function is_platform_bigendian() {
     // Stolen from: https://abdulapopoola.com/2019/01/20/check-endianness-with-javascript/
@@ -24,10 +24,10 @@ function is_platform_bigendian() {
     throw new Error('Unknown endianness');
 }
 
-function iter_integer_formats(byteorders=byteorders) {
+function iter_integer_formats(_byteorders=byteorders) {
     let result = [];
     for( const code of integer_codes ) {
-        for( const byteorder of byteorders ) {
+        for( const byteorder of _byteorders ) {
             if( !['','@'].includes(byteorder) && ['n','N'].includes(code) ) {
                 continue;
             }
@@ -259,10 +259,11 @@ describe('Test calcsize', function() {
 
 describe('Test integers', function() {
     class IntTester {
-        constructor(format, code) {
-            this.format = format;
+        constructor(byteorder, code) {
+            this.byteorder = byteorder
             this.code = code;
-            this.bytesize = jpstruct.calcsize(format);
+            this.format = byteorder + code;
+            this.bytesize = jpstruct.calcsize(this.format);
             this.bitsize = this.bytesize * 8;
             if( this.code == code.toUpperCase() ) {
                 this.signed = false;
@@ -278,6 +279,10 @@ describe('Test integers', function() {
         
         _test_one(x) {
             if( !(this.min_value <= BigInt(x) && BigInt(x) <= this.max_value) ) {
+                // Out of range
+                should.throws(() => {
+                    jpstruct.pack(this.format,x)
+                });
                 return;
             }
 
@@ -297,7 +302,12 @@ describe('Test integers', function() {
             
             expected = unhexlify(expected);
             
-            expected = [...(new Uint8Array(this.bytesize-expected.length)), ...expected].reverse();
+            // Extend to appropriate length
+            expected = [...(new Uint8Array(this.bytesize-expected.length)), ...expected]
+
+            if( this.byteorder == '<' || ['','@','='].includes(this.byteorder)) {
+                expected = expected.reverse();
+            }
             expected.length.should.be.eql(this.bytesize);
 
             // Test pack
@@ -312,6 +322,10 @@ describe('Test integers', function() {
             else{
                 retrieved[0].should.be.eql(x);
             }
+
+            should.throws(() => {
+                jpstruct.unpack(this.format,[...(new Uint8Array(1)), ...retrieved]);
+            });
         }
 
         run() {
@@ -361,10 +375,10 @@ describe('Test integers', function() {
     
     };
 
-    for(let code of integer_codes) {
-        let format = '<'+code;
+    for(let [code,byteorder] of iter_integer_formats()) {
+        let format = byteorder+code;
         it(`Passes integer checks for format: ${format}`, function() {
-            let test = new IntTester(format,code);
+            let test = new IntTester(byteorder,code);
             test.run();
         });
     }

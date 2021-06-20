@@ -335,6 +335,12 @@ function checkType(value,type) {
     }
 }
 
+function checkRange(value,min,max,packing_type) {
+    if( value < min || value > max ) {
+        throw new RangeError(`Value ${value} is out of range for ${packing_type}`);
+    }
+}
+
 function pack_char(view,offset,value,littleEndian) {
     checkType(value,'string');
     view.setUint8(offset,value.charCodeAt(0));
@@ -342,11 +348,13 @@ function pack_char(view,offset,value,littleEndian) {
 
 function pack_signed_char(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,-128,127,'signed char');
     view.setInt8(offset,value);
 }
 
 function pack_unsigned_char(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,0,255,'unsigned char');
     view.setUint8(offset,value);
 }
 
@@ -356,21 +364,25 @@ function pack_bool(view,offset,value,littleEndian) {
 
 function pack_short(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,-32768,32767,'signed short');
     view.setInt16(offset,value,littleEndian);
 }
 
 function pack_unsigned_short(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,0,65535,'unsigned short');
     view.setUint16(offset,value,littleEndian);
 }
 
 function pack_int(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,-2147483648,2147483647,'signed int');
     view.setInt32(offset,value,littleEndian);
 }
 
 function pack_unsigned_int(view,offset,value,littleEndian) {
     checkType(value,'number');
+    checkRange(value,0,4294967295,'unsigned int');
     view.setUint32(offset,value,littleEndian);
 }
 
@@ -382,6 +394,9 @@ function pack_long_long(view,offset,value,littleEndian) {
     if( valuetype !== 'bigint' ) {
         value = BigInt(value);
     }
+    if( value < -9223372036854775808n || value > 9223372036854775807n ) {
+        throw new RangeError(`Value ${value} is out of range for signed long long`);
+    }
     view.setBigInt64(offset,value,littleEndian);
 }
 
@@ -392,6 +407,9 @@ function pack_unsigned_long_long(view,offset,value,littleEndian) {
     }
     if( valuetype !== 'bigint' ) {
         value = BigInt(value);
+    }
+    if( value < 0 || value > 18446744073709551615n ) {
+        throw new RangeError(`Value ${value} is out of range for unsigned long long`);
     }
     view.setBigUint64(offset,value,littleEndian);
 }
