@@ -97,6 +97,35 @@ describe('Test consistency', function() {
 
 });
 
+describe('Test transitiveness', function() {
+    const c = 'a';
+    const b = 1;
+    const h = 255;
+    const i = 65535;
+    const l = 65536;
+    const f = 3.1415;
+    const d = 3.1415;
+    const t = true;
+
+    for(const prefix of ['', '@', '<', '>', '=', '!']) {
+        for(const base_format of ['xcbhilfd?', 'xcBHILfd?']) {
+            const format = prefix + base_format;
+            it(`Packs and unpacks for format: ${format}`, function() {
+                let packed = jpstruct.pack(format, c, b, h, i, l, f, d, t);
+                let [cp, bp, hp, ip, lp, fp, dp, tp] = jpstruct.unpack(format, packed);
+                cp.should.be.eql(c);
+                bp.should.be.eql(b);
+                hp.should.be.eql(h);
+                ip.should.be.eql(i);
+                lp.should.be.eql(l);
+                Math.round(100 * fp).should.be.eql(Math.round(100 * f))
+                Math.round(100 * dp).should.be.eql(Math.round(100 * d))
+                tp.should.be.eql(t);
+            });
+        }
+    }
+});
+
 describe('Test calcsize', function() {
     let expected_size = {
         'b': 1, 'B': 1,
