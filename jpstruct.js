@@ -117,7 +117,7 @@ export class Struct {
         let match;
         while( (match = re.exec(this.format)) !== null ) {
 
-            if( varargs[arg_index] === undefined ) {
+            if( varargs[arg_index] === undefined && match[2] !== "x" ) {
                 throw new Error("Insufficient arguments for format string");
             }
 
