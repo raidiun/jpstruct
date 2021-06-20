@@ -35,12 +35,16 @@ export class Struct {
             "L": [4,unpack_unsigned_int,pack_unsigned_int],
             "q": [8,unpack_long_long,pack_long_long],
             "Q": [8,unpack_unsigned_long_long,pack_unsigned_long_long],
+            "n": [4,unpack_int,pack_int],
+            "N": [4,unpack_unsigned_int,pack_unsigned_int],
+            "e": [2,unpack_unsigned_short,pack_unsigned_short],
             "f": [4,unpack_float,pack_float],
             "d": [8,unpack_double,pack_double],
+            "P": [4,unpack_unsigned_int,pack_unsigned_int],
         };
 
-    static _format_element_pattern = "(\\d+)?([AxcbBhHsfdiIlLqQ?])";
-    static _format_pattern = "^[@=<>!]?((\\d+)?([AxcbBhHsfdiIlLqQ?]))+$";
+    static _format_element_pattern = "(\\d+)?([xcbB?hHiIlLqQnNefdspP])";
+    static _format_pattern = "^[@=<>!]?((\\d+)?([xcbB?hHiIlLqQnNefdspP]))+$";
 
     static _is_format_littleendian(format) {
         switch( format[0] ) {
@@ -56,6 +60,19 @@ export class Struct {
         }
     }
 
+    static _is_p_available(format) {
+        switch( format[0] ) {
+            case('<'):
+            case('>'):
+            case('!'):
+            case('='):
+                return false;
+            case('@'):
+            default:
+                return true;
+        }
+    }
+
     constructor(format) {
         const formatRegex = new RegExp(Struct._format_pattern);
         if( ! formatRegex.test(format) ) {
@@ -64,6 +81,7 @@ export class Struct {
         this.format = format;
         this.size = this._calc_size();
         this.littleEndian = Struct._is_format_littleendian(format);
+        this.hasP = Struct._is_p_available(format);
     }
 
     _calc_size() {
@@ -135,6 +153,10 @@ export class Struct {
                 continue;
             }
 
+            if( match[2] == "P" && !this.hasP) {
+                throw new Error("P format character not supported for non-native ordering")
+            }
+
             for(let repeats = 0; repeats < count; repeats++) {
                 let [size,unpack_func,pack_func] = Struct._format_lookup[match[2]];
                 let result = pack_func(view,view_index,varargs[arg_index],this.littleEndian);
@@ -190,6 +212,10 @@ export class Struct {
                     unpacked_values.push(result);
                 }
                 continue;
+            }
+
+            if( match[2] == "P" && !this.hasP) {
+                throw new Error("P format character not supported for non-native ordering")
             }
 
             for(let repeats = 0; repeats < count; repeats++) {

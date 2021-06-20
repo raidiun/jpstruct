@@ -24,6 +24,19 @@ function is_platform_bigendian() {
     throw new Error('Unknown endianness');
 }
 
+function iter_integer_formats(byteorders=byteorders) {
+    let result = [];
+    for( const code of integer_codes ) {
+        for( const byteorder of byteorders ) {
+            if( !['','@'].includes(byteorder) && ['n','N'].includes(code) ) {
+                continue;
+            }
+            result.push([code,byteorder]);
+        }
+    }
+    return result;
+}
+
 // Convert hex chars to equivalent byteArray
 function unhexlify(hexdata) {
     var byteArray = new Uint8Array(hexdata.length/2);
@@ -173,29 +186,29 @@ describe('Test "new" features', function() {
         ['?', 0, b([0]), b([0]), 0],
         ['?', 3, b([1]), b([1]), 1],
         ['?', true, b([1]), b([1]), 0],
-//        ['?', [], b([0]), b([0]), 1],
+        // Note: This next test differs from the Python equivalent due to different falsy values
+        ['?', [], b([1]), b([1]), 1],
         ['?', [1,], b([1]), b([1]), 1]
     ];
     
     for(const [fmt,arg,big,lil,asy] of test_definitions) {
-        for( const [xfmt, exp] of [
+        it(`Passes tests of format ${fmt} with arg ${arg}`, function() {
+            for( const [xfmt, exp] of [
                 ['>'+fmt, big],
                 ['!'+fmt, big],
                 ['<'+fmt, lil],
                 ['='+fmt, is_platform_bigendian() ? big : lil ]
                 ])
-        {
-            it(`Passes test of format ${xfmt} with arg ${arg}`, function() {
+            {    
                 let packed = jpstruct.pack(xfmt, arg);
                 packed.should.be.eql(exp);
                 jpstruct.calcsize(xfmt).should.be.equal(packed.length)
                 let result = jpstruct.unpack(xfmt, packed)[0]
                 if(result != arg) {
                     asy.should.be.True;
-                    }
-            });
-
-        }
+                }
+            }
+        });
         
     }
 });
@@ -210,13 +223,37 @@ describe('Test calcsize', function() {
         };
 
     // standard integer sizes
-    for(let code of integer_codes) {
-        let format = '<'+code;
-        it(`Calculates correct size for format: ${format}`, function() {
+    it('Calculates correct size for standard integer formats', function() {
+        for( let [code,byteorder] of iter_integer_formats(['=','<','>','!']) ) {
+            const format = byteorder + code;
             let size = jpstruct.calcsize(format);
-            size.should.be.eql(expected_size[code]);
-        });
+            size.should.be.equal(expected_size[code]);
+        }
+    });
+    
+
+    const native_pairs = ['bB', 'hH', 'iI', 'lL', 'nN', 'qQ'];
+    for( let format_pair of native_pairs ) {
+        for( let byteorder of ['','@'] ) {
+            it(`Calculates matching sizes for: ${format_pair}`, function() {
+                let signed_size = jpstruct.calcsize(byteorder + format_pair[0]);
+                let unsigned_size = jpstruct.calcsize(byteorder + format_pair[1]);
+                signed_size.should.be.equal(unsigned_size);
+            });
+        }
     }
+
+    it('Has correct bounds for native integer sizes', function() {
+        jpstruct.calcsize('b').should.be.equal(1);
+        jpstruct.calcsize('h').should.be.greaterThanOrEqual(2);
+        jpstruct.calcsize('l').should.be.greaterThanOrEqual(4);
+        jpstruct.calcsize('h').should.be.lessThanOrEqual(jpstruct.calcsize('i'));
+        jpstruct.calcsize('i').should.be.lessThanOrEqual(jpstruct.calcsize('l'));
+        jpstruct.calcsize('q').should.be.greaterThanOrEqual(8);
+        jpstruct.calcsize('l').should.be.lessThanOrEqual(jpstruct.calcsize('q'));
+        jpstruct.calcsize('n').should.be.greaterThanOrEqual(jpstruct.calcsize('i'));
+        jpstruct.calcsize('n').should.be.greaterThanOrEqual(jpstruct.calcsize('P'));
+    });
 
 });
 
