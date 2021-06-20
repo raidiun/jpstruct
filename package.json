@@ -1,6 +1,6 @@
 {
   "name": "jpstruct",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "WebAPI port of Python's struct",
   "main": "jpstruct.js",
   "type": "module",
