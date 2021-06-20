@@ -9,6 +9,21 @@ import * as jpstruct from '../jpstruct.js';
 const integer_codes = ['b', 'B', 'h', 'H', 'i', 'I', 'l', 'L', 'q', 'Q', ];
 const byteorders = ['<'];// Only testing explicit little endian for now
 
+function is_platform_bigendian() {
+    // Stolen from: https://abdulapopoola.com/2019/01/20/check-endianness-with-javascript/
+    const uint32Array = new Uint32Array([0x11223344]);
+    const uint8Array = new Uint8Array(uint32Array.buffer);
+
+    if(uint8Array[0] === 0x44) {
+        return false;
+    }
+    else if( uint8Array[0] === 0x11 ) {
+        return true;
+    }
+
+    throw new Error('Unknown endianness');
+}
+
 // Convert hex chars to equivalent byteArray
 function unhexlify(hexdata) {
     var byteArray = new Uint8Array(hexdata.length/2);
@@ -17,6 +32,70 @@ function unhexlify(hexdata) {
     }
     return byteArray
 }
+
+describe('Test native byteorder', function() {
+    it('Uses correct native endianness', function() {
+        let packed = jpstruct.pack('=i',1);
+        (packed[0] === 0).should.be.eql(is_platform_bigendian());
+    });
+});
+
+describe('Test consistency', function() {
+    it('Throws on invalid format string',function() {
+        should.throws(() => {
+            jpstruct.calcsize('Z');
+        });
+    });
+
+    it('Scales sizes',function() {
+        const size = jpstruct.calcsize('i');
+        jpstruct.calcsize('iii').should.be.eql(size * 3);
+
+        const fmt = 'cbxxxxxxhhhhiillffd?';
+        const fmt3 = '3c3b18x12h6i6l6f3d3?';
+        const sz = jpstruct.calcsize(fmt);
+        const sz3 = jpstruct.calcsize(fmt3);
+        sz3.should.be.eql(sz * 3);
+    });
+
+    it('Throws with incorrect number of arguments', function() {
+        should.throws(() => {
+            jpstruct.pack('iii', 3);
+        });
+
+        should.throws(() => {
+            jpstruct.pack('i', 3, 3, 3);
+        });
+    });
+
+
+    it('Throws with incorrect argument types', function() {
+        should.throws(() => {
+            jpstruct.pack('i', 'foo');
+        });
+
+        should.throws(() => {
+            jpstruct.pack('P', 'foo');
+        });
+    });
+
+    it('Throws with invalid data', function() {
+        should.throws(() => {
+            jpstruct.unpack('d',Uint8Array.from(['f','l','a','p']));
+        });
+
+        const packed = jpstruct.pack('ii', 1, 2)
+
+        should.throws(() => {
+            jpstruct.unpack('iii', s);
+        });
+
+        should.throws(() => {
+            jpstruct.unpack('i', s);
+        });
+    });
+
+});
 
 describe('Test calcsize', function() {
     let expected_size = {
