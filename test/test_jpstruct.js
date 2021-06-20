@@ -110,6 +110,16 @@ describe('Test consistency', function() {
         */
     });
 
+    // TODO: Check if this test is elsewhere in the suite
+    it('Throws for non-native P',function() {
+        should.throws(() => {
+            jpstruct.pack('<P', 100);
+        },Error);
+        should.throws(() => {
+            jpstruct.unpack('<P', new Uint8Array(8));
+        },Error);
+    });
+
 });
 
 describe('Test transitiveness', function() {
@@ -393,6 +403,12 @@ describe('Test integers', function() {
             test.run();
         });
     }
+
+    it('Throws for values beyond int64 max sizes', function() {
+        should.throws(() => {
+            jpstruct.pack('<q',-9223372036854775810n);
+        },Error);
+    });
 });
 
 // TODO: Pascal String support?
@@ -791,6 +807,28 @@ describe('MAVLink tests:', function() {
         let bytes = [...buf];
         bytes.should.be.eql(body);
     });
+
+    it('Supports whutespace in format strings', function() {
+
+        this.msgId = 130;
+
+        var v1 = ((this.msgId & 0xFF) << 8) | ((this.msgId >> 8) & 0xFF);
+        var v2 = this.msgId>>16;
+
+        v1.should.be.eql(33280);
+        v2.should.be.eql(0);
+
+        var orderedfields =  [253,13,0,0,40,11,10,33280,0];
+
+        var buf =  jpstruct.pack(`<B B  BBBB
+            BHB`,...orderedfields);
+
+        let body = [0xfd, 0x0d, 0x00, 0x00, 0x28, 0x0b, 0x0a, 0x00, 0x82, 0x00];
+
+        let bytes = [...buf];
+        bytes.should.be.eql(body);
+    });
+
 
 });
 

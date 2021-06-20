@@ -1,7 +1,6 @@
 /*
 
 ECMA module to emulate Python's struct
-Minimal for MAVLink work
 
 */
 
@@ -44,7 +43,7 @@ export class Struct {
         };
 
     static _format_element_pattern = "(\\d+)?([xcbB?hHiIlLqQnNefdspP])";
-    static _format_pattern = "^[@=<>!]?((\\d+)?([xcbB?hHiIlLqQnNefdspP]))+$";
+    static _format_pattern = "^[@=<>!]?\\s*((\\d+)?([xcbB?hHiIlLqQnNefdspP]\\s*))+$";
 
     static _is_format_littleendian(format) {
         switch( format[0] ) {
