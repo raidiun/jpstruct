@@ -248,7 +248,7 @@ export function unpack_from(format,buffer,offset=0) {
     return (new Struct(format)).unpack_from(buffer,offset);
 }
 
-// Little-endian unpack routines
+// Unpack routines
 function unpack_char(view,offset,littleEndian) {
     return String.fromCharCode(view.getUint8(offset));
 }
@@ -302,58 +302,81 @@ function unpack_string(view,offset,length) {
     return new Uint8Array(view.buffer,view.byteOffset+offset,length);
 }
 
-// Little-endian pack routines
+// Pack routines
+function checkType(value,type) {
+    if( typeof value !== type ) {
+        throw new TypeError(`Expected ${type}, got ${typeof value} (${value})`);
+    }
+}
+
 function pack_char(view,offset,value,littleEndian) {
+    checkType(value,'string');
     view.setUint8(offset,value.charCodeAt(0));
 }
 
 function pack_signed_char(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setInt8(offset,value);
 }
 
 function pack_unsigned_char(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setUint8(offset,value);
 }
 
 function pack_bool(view,offset,value,littleEndian) {
-    view.setUint8(offset,value ? 1 : 0);
+    view.setUint8(offset,!!value);
 }
 
 function pack_short(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setInt16(offset,value,littleEndian);
 }
 
 function pack_unsigned_short(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setUint16(offset,value,littleEndian);
 }
 
 function pack_int(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setInt32(offset,value,littleEndian);
 }
 
 function pack_unsigned_int(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setUint32(offset,value,littleEndian);
 }
 
 function pack_long_long(view,offset,value,littleEndian) {
-    if( typeof value !== 'bigint' ) {
+    let valuetype = typeof value;
+    if( valuetype !== 'number' && valuetype !== 'bigint' ) {
+        throw new TypeError(`Expected either 'number' or 'bigint', got ${typeof value} (${value})`);
+    }
+    if( valuetype !== 'bigint' ) {
         value = BigInt(value);
     }
     view.setBigInt64(offset,value,littleEndian);
 }
 
 function pack_unsigned_long_long(view,offset,value,littleEndian) {
-    if( typeof value !== 'bigint' ) {
+    let valuetype = typeof value;
+    if( valuetype !== 'number' && valuetype !== 'bigint' ) {
+        throw new TypeError(`Expected either 'number' or 'bigint', got ${typeof value} (${value})`);
+    }
+    if( valuetype !== 'bigint' ) {
         value = BigInt(value);
     }
     view.setBigUint64(offset,value,littleEndian);
 }
 
 function pack_float(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setFloat32(offset,value,littleEndian);
 }
 
 function pack_double(view,offset,value,littleEndian) {
+    checkType(value,'number');
     view.setFloat64(offset,value,littleEndian);
 }
 
